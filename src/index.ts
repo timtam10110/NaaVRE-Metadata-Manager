@@ -6,13 +6,34 @@ import {
 import { ISettingRegistry } from '@jupyterlab/settingregistry';
 import { Collapse } from '@jupyterlab/apputils';
 import { Panel, Widget } from '@lumino/widgets';
+import { tagslist } from './tags';
+
+
+class CheckboxButtonHolder extends Widget {
+  private checkboxlist: CheckboxButton[];
+
+  constructor() {
+    super();
+    this.checkboxlist = [];
+  }
+
+  addCheckbox(checkbox: CheckboxButton): void {
+    this.checkboxlist.push(checkbox);
+  }
+
+  getCheckboxes(): CheckboxButton[] {
+    return this.checkboxlist;
+  }
+}
 
 
 class CheckboxButton extends Widget {
   private checkbox: HTMLInputElement;
+  public labelstring: string;
 
-  constructor() {
+  constructor(labelstring: string) {
     super();
+    this.labelstring = labelstring;
     this.addClass('myCheckboxButton');
     this.checkbox = document.createElement('input');
     this.checkbox.type = 'checkbox';
@@ -22,12 +43,12 @@ class CheckboxButton extends Widget {
     this.node.appendChild(this.checkbox);
 
     const label = document.createElement('label');
-    label.textContent = 'Click me';
+    label.textContent = this.labelstring;
     this.node.appendChild(label);
 
     this.node.onclick = () => {
       this.checkbox.checked = !this.checkbox.checked;
-      console.log('Checkbox button clicked, checked:', this.checkbox.checked);
+      console.log('Checkbox button clicked, checked:', this.labelstring, this.checkbox.checked);
     };
   }
 
@@ -63,33 +84,37 @@ const plugin: JupyterFrontEndPlugin<void> = {
         });
     }
 
-    const myCheckboxButton = new CheckboxButton();
-    myCheckboxButton.id = 'naavre-checkbox-button';
-    myCheckboxButton.hide();
-
-
-    // Create a new collapsable button.
-    const myCollapse = new Collapse({
-      widget: new Widget(),
-      collapsed: true
-    });
-    myCollapse.id = 'naavre-button';
-    myCollapse.title.label = 'Yippee';
-
-    // When collapse changes, make toolbarbutton visible.
-    myCollapse.collapseChanged.connect((sender, collapsed) => {
-      if (myCollapse.collapsed) {
-        myCheckboxButton.hide();
-      } else {
-        myCheckboxButton.show();
-      }
-    });
-
     // Create a new panel and add the collapse and toolbar button.
     const myPanel = new Panel();
     myPanel.id = "naavre-panel";
-    myPanel.addWidget(myCollapse);
-    myPanel.addWidget(myCheckboxButton);
+
+    for (let tag of tagslist) {
+      const newcollapse = new Collapse({
+        widget: new CheckboxButtonHolder(),
+        collapsed: true
+      });
+      newcollapse.id = tag.get_category() + '-collapse';
+      newcollapse.title.label = tag.get_category();
+      myPanel.addWidget(newcollapse);
+
+      for (let tagname of tag.get_tags()) {
+        const newcheckbox = new CheckboxButton(tagname);
+        newcheckbox.id = tagname + '-checkbox-button';
+        newcheckbox.hide();
+        myPanel.addWidget(newcheckbox);
+        newcollapse.widget.addCheckbox(newcheckbox);
+      }
+
+      newcollapse.collapseChanged.connect((sender, collapsed) => {
+        for (let box of newcollapse.widget.getCheckboxes()) {
+          if (newcollapse.collapsed) {
+            box.hide();
+          } else {
+            box.show();
+          }
+        }
+      }
+    )};
 
     // Add the panel to the toolbar on the left.
     app.shell.add(myPanel, 'left', { rank: 1000 });
