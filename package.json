@@ -1,6 +1,6 @@
 {
     "name": "naavre-extension",
-    "version": "0.2.1",
+    "version": "0.3.0",
     "description": "A NaaVRE extension for managing metadata",
     "keywords": [
         "jupyter",

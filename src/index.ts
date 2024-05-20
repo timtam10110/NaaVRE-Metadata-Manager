@@ -4,7 +4,7 @@ import {
 } from '@jupyterlab/application';
 
 import { ISettingRegistry } from '@jupyterlab/settingregistry';
-import { Collapse } from '@jupyterlab/apputils';
+import { Collapser } from '@jupyterlab/ui-components';
 import { Panel, Widget } from '@lumino/widgets';
 import { tagslist } from './tags';
 
@@ -26,9 +26,8 @@ class CheckboxButtonHolder extends Widget {
   }
 }
 
-
 class CheckboxButton extends Widget {
-  private checkbox: HTMLInputElement;
+  public checkbox: HTMLInputElement;
   public labelstring: string;
 
   constructor(labelstring: string) {
@@ -45,11 +44,6 @@ class CheckboxButton extends Widget {
     const label = document.createElement('label');
     label.textContent = this.labelstring;
     this.node.appendChild(label);
-
-    this.node.onclick = () => {
-      this.checkbox.checked = !this.checkbox.checked;
-      console.log('Checkbox button clicked, checked:', this.labelstring, this.checkbox.checked);
-    };
   }
 
   show(): void {
@@ -59,8 +53,15 @@ class CheckboxButton extends Widget {
   hide(): void {
     this.node.style.display = 'none';
   }
-}
 
+  get checked(): boolean {
+    return this.checkbox.checked;
+  }
+
+  set checked(checked: boolean) {
+    this.checkbox.checked = checked;
+  }
+}
 
 /**
  * Initialization data for the naavre-extension extension.
@@ -70,55 +71,67 @@ const plugin: JupyterFrontEndPlugin<void> = {
   description: 'A NaaVRE extension for managing metadata',
   autoStart: true,
   optional: [ISettingRegistry],
-  activate: (app: JupyterFrontEnd, settingRegistry: ISettingRegistry | null) => {
-    console.log('JupyterLab extension naavre-extension is activated! 2');
+  activate: async (app: JupyterFrontEnd, settingRegistry: ISettingRegistry | null) => {
+    console.log('JupyterLab extension naavre-extension is activated!');
 
     if (settingRegistry) {
-      settingRegistry
-        .load(plugin.id)
-        .then(settings => {
-          console.log('naavre-extension settings loaded:', settings.composite);
-        })
-        .catch(reason => {
-          console.error('Failed to load settings for naavre-extension.', reason);
-        });
-    }
+      try {
+        const settings = await settingRegistry.load(plugin.id);
+        console.log('naavre-extension settings loaded:', settings.composite);
 
-    // Create a new panel and add the collapse and toolbar button.
-    const myPanel = new Panel();
-    myPanel.id = "naavre-panel";
+        // This is the panel in which the extension lives.
+        const myPanel = new Panel();
+        myPanel.id = "naavre-panel";
 
-    for (let tag of tagslist) {
-      const newcollapse = new Collapse({
-        widget: new CheckboxButtonHolder(),
-        collapsed: true
-      });
-      newcollapse.id = tag.get_category() + '-collapse';
-      newcollapse.title.label = tag.get_category();
-      myPanel.addWidget(newcollapse);
+        // Load categories for tags..
+        for (let tag of tagslist) {
+          const div = document.createElement('div');
+          div.textContent = tag.get_category();
+          const newcollapse = new Collapser({
+            widget: new CheckboxButtonHolder(), // Needed to track all checkboxes for a category.
+            node: div,
+            collapsed: true
+          });
+          newcollapse.id = tag.get_category() + '-collapse';
+          myPanel.addWidget(newcollapse);
 
-      for (let tagname of tag.get_tags()) {
-        const newcheckbox = new CheckboxButton(tagname);
-        newcheckbox.id = tagname + '-checkbox-button';
-        newcheckbox.hide();
-        myPanel.addWidget(newcheckbox);
-        newcollapse.widget.addCheckbox(newcheckbox);
-      }
+          // Load tags within the category.
+          for (let tagname of tag.get_tags()) {
+            const newcheckbox = new CheckboxButton(tagname);
+            newcheckbox.id = tagname + '-checkbox-button';
+            newcheckbox.hide();
+            let savedState = settings.get(tagname).composite as boolean;
+            if (savedState !== undefined) { // Load the saved state of the checkbox.
+              newcheckbox.checkbox.checked = savedState;
+            }
 
-      newcollapse.collapseChanged.connect((sender, collapsed) => {
-        for (let box of newcollapse.widget.getCheckboxes()) {
-          if (newcollapse.collapsed) {
-            box.hide();
-          } else {
-            box.show();
+            newcheckbox.node.onclick = () => {  // Save the state of the checkbox.
+              newcheckbox.checkbox.checked = !newcheckbox.checkbox.checked;
+              settings.set(tagname, newcheckbox.checkbox.checked);
+              console.log('Checkbox button clicked, checked:', tagname, newcheckbox.checkbox.checked);
+            }
+            myPanel.addWidget(newcheckbox);
+            newcollapse.widget.addCheckbox(newcheckbox);
           }
-        }
-      }
-    )};
 
-    // Add the panel to the toolbar on the left.
-    app.shell.add(myPanel, 'left', { rank: 1000 });
+          // Add a listener to the collapse button to hide/show the checkboxes.
+          newcollapse.collapseChanged.connect((sender, collapsed) => {
+            for (let box of newcollapse.widget.getCheckboxes()) {
+              if (newcollapse.collapsed) {
+                box.hide();
+              } else {
+                box.show();
+              }
+            }
+          })
+        };
 
+        // Add the panel to the toolbar on the left.
+        app.shell.add(myPanel, 'left', { rank: 1000 });
+      } catch(reason) {
+        console.error('Failed to load settings for naavre-extension.', reason);
+      };
+    }
   }
 };
 
