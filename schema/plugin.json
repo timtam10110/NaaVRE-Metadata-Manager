@@ -1,0 +1,8 @@
+{
+  "jupyter.lab.shortcuts": [],
+  "title": "naavre-extension",
+  "description": "naavre-extension settings.",
+  "type": "object",
+  "properties": {},
+  "additionalProperties": false
+}
