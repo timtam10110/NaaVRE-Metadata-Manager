@@ -1,6 +1,6 @@
 {
     "name": "naavre-extension",
-    "version": "0.3.0",
+    "version": "0.3.1",
     "description": "A NaaVRE extension for managing metadata",
     "keywords": [
         "jupyter",
@@ -57,6 +57,7 @@
     },
     "dependencies": {
         "@jupyterlab/application": "^4.0.0",
+        "@jupyterlab/launcher": "^4.0.0",
         "@jupyterlab/settingregistry": "^4.0.0"
     },
     "devDependencies": {
