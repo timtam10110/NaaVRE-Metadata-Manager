@@ -1,0 +1,11 @@
+{
+    "type": "object",
+    "properties": {
+        "Item1": {
+            "type": "string",
+            "default": "empty",
+            "description": "item value"
+        }
+    },
+    "additionalProperties": true
+}
