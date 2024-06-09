@@ -77,3 +77,196 @@ const ElectricalEngineering = new Tags("Electrical Engineering", electricalengin
 const General = new Tags("General", generaltags);
 
 export const tagslist = [Physics, Mathematics, ComputerScience, Biology, Economics, Statistics, ElectricalEngineering, General];
+
+export var required_metadata = [
+    "title", "upload_type", "publication_type", "image_type", "creators", "description", "access_right", "license_id", "license_title", "license_url", "embargo_date"
+]
+
+export var optional_metadata = [
+    "doi", "prereserve_doi", "notes", "related_identifiers", "contributors", "references", "communities", "version", "language", "method"
+]
+
+export class MetadataItems {
+    // This will do something later, I promise :skull:
+    private RequiredhtmlItems: HTMLElement[] = [];
+    private requiredhtmlLabels: HTMLElement[] = [];
+    private OptionalhtmlItems: HTMLElement[] = [];
+    private optionalhtmlLabels: HTMLElement[] = [];
+
+    constructor() {
+        this.setup_required_items();
+        this.setup_optional_items();
+    }
+
+    setup_required_items(): void {
+        const l1 = "upload_type";
+        const label1 = this.createLabel(l1);
+        var options = ["publication", "poster", "presentation", "dataset", "image", "video", "software", "lesson", "physicalobject", "other"];
+        const select1 = this.createDropdownMenu(l1, l1, options, true);
+        this.requiredhtmlLabels.push(label1);
+        this.RequiredhtmlItems.push(select1);
+
+        const l2 = "publication_type";
+        const label2 = this.createLabel(l2);
+        options = ["annotationcollection", "book", "section", "conferencepaper", "datamanagementplan", "article", "patent", "preprint", "deliverable", "milestone",
+                   "proposal", "report", "softwaredocumentation", "technicalnote", "thesis", "workingpaper", "other"];
+        const select2 = this.createDropdownMenu(l2, l2, options, true);
+        this.requiredhtmlLabels.push(label2);
+        this.RequiredhtmlItems.push(select2);
+
+        const l3 = "image_type";
+        const label3 = this.createLabel(l3);
+        options = ["figure", "plot", "drawing", "diagram", "photo", "other"];
+        const select3 = this.createDropdownMenu(l3, l3, options, true);
+        this.requiredhtmlLabels.push(label3);
+        this.RequiredhtmlItems.push(select3);
+
+        const l4 = "title";
+        const label4 = this.createLabel(l4);
+        const input4 = this.createInputMenu(l4, l4, "text", true);
+        this.requiredhtmlLabels.push(label4);
+        this.RequiredhtmlItems.push(input4);
+
+        const l5 = "creators";
+        const label5 = this.createLabel(l5);
+        const input5 = this.createInputMenu(l5, l5, "text", true);
+        // Add information on how to specify multiple creators (separate by ;)
+        this.requiredhtmlLabels.push(label5);
+        this.RequiredhtmlItems.push(input5);
+
+        const l6 = "description";
+        const label6 = this.createLabel(l6);
+        const input6 = this.createInputMenu(l6, l6, "text", true);
+        // Make larger through css
+        this.requiredhtmlLabels.push(label6);
+        this.RequiredhtmlItems.push(input6);
+
+        const l7 = "access_right";
+        const label7 = this.createLabel(l7);
+        options = ["open", "embargoed", "restricted", "closed"];
+        const select7 = this.createDropdownMenu(l7, l7, options, true);
+        this.requiredhtmlLabels.push(label7);
+        this.RequiredhtmlItems.push(select7);
+
+        const l8 = "license";
+        const label8 = this.createLabel(l8);
+        const licenseid = this.createInputMenu("License id", "License id", "text", true);
+        const licensetitle = this.createInputMenu("License title", "License title", "text", true);
+        const licenseurl = this.createInputMenu("License url", "License url", "text", true);
+        this.requiredhtmlLabels.push(label8);
+        this.RequiredhtmlItems.push(licenseid);
+        this.RequiredhtmlItems.push(licensetitle);
+        this.RequiredhtmlItems.push(licenseurl);
+
+        const l9 = "embargo_date";
+        const label9 = this.createLabel(l9);
+        const input9 = this.createInputMenu(l9, l9, "date", true);
+        this.requiredhtmlLabels.push(label9);
+        this.RequiredhtmlItems.push(input9);
+
+        const l10 = "access_conditions";
+        const label10 = this.createLabel(l10);
+        const input10 = this.createInputMenu(l10, l10, "text", true);
+        this.requiredhtmlLabels.push(label10);
+        this.RequiredhtmlItems.push(input10);
+        console.log("end of setup", this.RequiredhtmlItems.length, this.requiredhtmlLabels.length);
+    }
+
+    setup_optional_items(): void {
+        const l1 = "doi";
+        const label1 = this.createLabel(l1);
+        const input1 = this.createInputMenu(l1, l1, "text", false);
+        this.optionalhtmlLabels.push(label1);
+        this.OptionalhtmlItems.push(input1);
+
+        const l2 = "prereserve_doi";
+        const label2 = this.createLabel(l2);
+        const input2 = this.createDropdownMenu(l2, l2, ["yes", "no"], false);
+        this.optionalhtmlLabels.push(label2);
+        this.OptionalhtmlItems.push(input2);
+
+        const l3 = "notes";
+        const label3 = this.createLabel(l3);
+        const input3 = this.createInputMenu(l3, l3, "text", false);
+        this.optionalhtmlLabels.push(label3);
+        this.OptionalhtmlItems.push(input3);
+
+        const l4 = "contributors";
+        const label4 = this.createLabel(l4);
+        const input4 = this.createInputMenu(l4, l4, "text", false);
+        this.optionalhtmlLabels.push(label4);
+        this.OptionalhtmlItems.push(input4);
+
+        const l5 = "references";
+        const label5 = this.createLabel(l5);
+        const input5 = this.createInputMenu(l5, l5, "text", false);
+        this.optionalhtmlLabels.push(label5);
+        this.OptionalhtmlItems.push(input5);
+
+        const l6 = "communities";
+        const label6 = this.createLabel(l6);
+        const input6 = this.createInputMenu(l6, l6, "text", false);
+        this.optionalhtmlLabels.push(label6);
+        this.OptionalhtmlItems.push(input6);
+
+        const l7 = "version";
+        const label7 = this.createLabel(l7);
+        const input7 = this.createInputMenu(l7, l7, "text", false);
+        this.optionalhtmlLabels.push(label7);
+        this.OptionalhtmlItems.push(input7);
+
+        const l8 = "language";
+        const label8 = this.createLabel(l8);
+        const input8 = this.createInputMenu(l8, l8, "text", false);
+        this.optionalhtmlLabels.push(label8);
+        this.OptionalhtmlItems.push(input8);
+
+        const l9 = "method";
+        const label9 = this.createLabel(l9);
+        const input9 = this.createInputMenu(l9, l9, "text", false);
+        this.optionalhtmlLabels.push(label9);
+        this.OptionalhtmlItems.push(input9);
+
+        console.log("end of setup 2", this.OptionalhtmlItems.length, this.optionalhtmlLabels.length);
+    }
+
+    createDropdownMenu(id: string, name: string, options: string[], required: boolean): HTMLElement {
+        const select = document.createElement('select');
+        select.id = id;
+        select.name = name;
+        select.required = required;
+        for (let item of options) {
+            const option = document.createElement('option');
+            option.value = item;
+            option.text = item;
+            select.appendChild(option);
+        }
+        return select;
+    }
+
+    createInputMenu(id: string, name: string, type: string, required: boolean): HTMLElement {
+        const input = document.createElement('input');
+        input.type = type;
+        input.id = id;
+        input.name = name;
+        input.placeholder = name;
+        input.required = required;
+        return input;
+    }
+
+    createLabel(text: string): HTMLElement {
+        const label = document.createElement('label');
+        label.textContent = text;
+        return label;
+    }
+
+    getRequiredItems(): [HTMLElement[], HTMLElement[]] {
+        console.log(this.RequiredhtmlItems.length, this.requiredhtmlLabels.length);
+        return [this.RequiredhtmlItems, this.requiredhtmlLabels];
+    }
+
+    getOptionalItems(): [HTMLElement[], HTMLElement[]] {
+        console.log(this.OptionalhtmlItems.length, this.optionalhtmlLabels.length);
+        return [this.OptionalhtmlItems, this.optionalhtmlLabels];
+    }
+}

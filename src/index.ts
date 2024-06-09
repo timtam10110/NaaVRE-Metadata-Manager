@@ -9,7 +9,7 @@ import { ILauncher } from '@jupyterlab/launcher';
 import { PageConfig } from '@jupyterlab/coreutils';
 import { Panel, Widget } from '@lumino/widgets';
 
-import { tagslist } from './tags';
+import { tagslist, required_metadata, optional_metadata } from './tags';
 import { CheckboxButton, CheckboxButtonHolder } from './checkbox';
 
 
@@ -36,38 +36,76 @@ class metadataManagerWidget extends Widget {
     this.addClass('metadataManagerWidget');
   }
 
-  async setUp(cwd: string, settingsRegistry: ISettingRegistry, id: string) {
-    const settings = await settingsRegistry.load(id);
-
+  // Set up the widget with the required items. Made async so it can access settings.
+  setUp(cwd: string, settings: ISettingRegistry.ISettings) {
     // These are the important and required items, make a header for them to separate from the rest.
     const header = document.createElement('h2');
     header.textContent = 'Required Items:';
     this.node.appendChild(header);
     this.node.appendChild(document.createElement('br'));
 
-    const itemsToAdd = ['Item1', 'Item2', 'Item3', 'Item4', 'Item5'];
+    const itemsToAdd = required_metadata;
     for (let item of itemsToAdd) {
-      // Put the item name first
-      const itemLabel = document.createElement('label');
-      itemLabel.textContent = item + ' ';
-      this.node.appendChild(itemLabel);
-
-      // Add input field
-      const inputField = document.createElement('input');
-      inputField.type = 'text';
-      inputField.placeholder = item;
-
-      const savedState = settings.get(cwd + '-' + item).composite as string;
-      console.log('Saved state:', savedState);
-      console.log('Item:', cwd + '-' + item);
-      if (savedState !== null) {
-        inputField.value = savedState;
-      }
-
-      this.inputFields.push(inputField);
-      this.node.appendChild(inputField);
-      this.node.appendChild(document.createElement('br'));
+      this.addItem(item, settings, cwd);
     }
+
+    // These are the optional items, make a header for them to separate from the rest.
+    const optionalHeader = document.createElement('h2');
+    optionalHeader.textContent = 'Optional Items:';
+    this.node.appendChild(optionalHeader);
+    this.node.appendChild(document.createElement('br'));
+
+    const optionalItemsToAdd = optional_metadata;
+    for (let item of optionalItemsToAdd) {
+      this.addItem(item, settings, cwd);
+    }
+    this.node.appendChild(document.createElement('br'));
+
+    const button = document.createElement('button');
+    button.textContent = 'Save Metadata';
+    this.node.appendChild(button);
+
+    button.addEventListener('click', () => {
+      console.log(this.toJSON(settings));
+      // download the metadata as a json file
+      const metadata = this.toJSON(settings);
+      const metadataString = JSON.stringify(metadata, null, 2);
+      const blob = new Blob([metadataString], {type: "application/json"});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = "metadata.json";
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    });
+  }
+
+  addItem(item: string, settings: ISettingRegistry.ISettings, cwd: string): void {
+    // Put the item name first
+    const itemLabel = document.createElement('label');
+    itemLabel.textContent = item + ' ';
+    this.node.appendChild(itemLabel);
+
+    // Add input field
+    const inputField = document.createElement('input');
+    inputField.type = 'text';
+    inputField.placeholder = item;
+
+    const savedState = settings.get(cwd + '-' + item).composite as string;
+    if (savedState !== null && savedState !== undefined) {
+      inputField.value = savedState;
+    }
+
+    this.inputFields.push(inputField);
+    this.node.appendChild(inputField);
+    this.node.appendChild(document.createElement('br'));
+
+    // Add a listener to the input field
+    inputField.addEventListener('change', () => {
+      settings.set(cwd + '-' + inputField.placeholder, inputField.value);
+    });
   }
 
   getInputValue(index: number): string {
@@ -80,6 +118,38 @@ class metadataManagerWidget extends Widget {
 
   getItemsLength(): number {
     return this.inputFields.length;
+  }
+
+  toJSON(settings: ISettingRegistry.ISettings): any {
+    let obj: any = {};
+    for (let i = 0; i < this.inputFields.length; i++) {
+      if (this.inputFields[i].placeholder.includes("license")) {
+        if (!obj["license"]) {
+          obj["license"] = {};
+        }
+        obj["license"][this.inputFields[i].placeholder] = this.inputFields[i].value;
+        continue;
+      }
+      // If field is empty, ignore
+      if (this.inputFields[i].value === '') {
+        continue;
+      }
+      obj[this.inputFields[i].placeholder] = this.inputFields[i].value;
+    }
+
+    // Loop over the checkboxes and add them to the object.
+    obj["keywords"] = {};
+    const cwd = hash(PageConfig.getOption('serverRoot'));
+    for (let tag of tagslist) {
+      for (let tagname of tag.get_tags()) {
+        const tagvar = cwd + tagname;
+        let savedState = settings.get(tagvar).composite as boolean;
+        if (savedState !== undefined && savedState !== null && savedState !== false) {
+          obj["keywords"][tagname] = savedState;
+        }
+      }
+    }
+    return obj;
   }
 }
 
@@ -109,9 +179,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
       console.log('naavre-extension settings loaded:', settings.composite);
 
       const CWD = PageConfig.getOption('serverRoot');
-      const CWDHash = hash(CWD);    // -1873337822
-      console.log('Current working directory:', CWD);
-      console.log('hash:', CWDHash);
+      const CWDHash = hash(CWD);
 
       // This is the panel in which the extension lives.
       const myPanel = new Panel();
@@ -142,7 +210,6 @@ const plugin: JupyterFrontEndPlugin<void> = {
           newcheckbox.node.onclick = () => {  // Save the state of the checkbox.
             newcheckbox.checkbox.checked = !newcheckbox.checkbox.checked;
             settings.set(CWDHash + tagname, newcheckbox.checkbox.checked);
-            console.log('Checkbox button clicked, checked:', tagname, newcheckbox.checkbox.checked);
           }
           myPanel.addWidget(newcheckbox);
           newcollapse.widget.addCheckbox(newcheckbox);
@@ -176,20 +243,12 @@ const plugin: JupyterFrontEndPlugin<void> = {
         label: 'Open metadata manager Widget',
         execute: () => {
           const widget = new metadataManagerWidget();
-          widget.setUp(CWDHash, settingRegistry, plugin.id);
+          widget.setUp(CWDHash, settings);
+
+          // Focus on the new window.
           app.shell.add(widget, 'main');
-          app.shell.activateById(widget.id);
           app.shell.currentWidget?.close();
-
-          // Make all input fields in the widget listen for changes.
-          for (let i = 0; i < widget.getItemsLength(); i++) {
-            widget.getInput(i).addEventListener('change', () => {
-              console.log('Input field changed:', widget.getInputValue(i));
-
-              settings.set(CWDHash + '-' + widget.getInput(i).placeholder, widget.getInputValue(i));
-              console.log(CWDHash + '-' + widget.getInput(i).placeholder, widget.getInputValue(i));
-            });
-          }
+          app.shell.activateById(widget.id);
         }
       });
 
