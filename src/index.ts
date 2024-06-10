@@ -11,6 +11,7 @@ import { Panel, Widget } from '@lumino/widgets';
 
 import { tagslist, required_metadata, optional_metadata } from './tags';
 import { CheckboxButton, CheckboxButtonHolder } from './checkbox';
+import '../style/index.css';
 
 
 function hash(item: string): string {
@@ -33,7 +34,7 @@ class metadataManagerWidget extends Widget {
     this.id = "metadataManagerWidget";
     this.title.label = 'Metadata Manager';
     this.title.closable = true;
-    this.addClass('metadataManagerWidget');
+    this.addClass('metadata-manager-widget-container');
   }
 
   // Set up the widget with the required items. Made async so it can access settings.
@@ -62,7 +63,7 @@ class metadataManagerWidget extends Widget {
     this.node.appendChild(document.createElement('br'));
 
     const button = document.createElement('button');
-    button.textContent = 'Save Metadata';
+    button.textContent = 'Export Metadata';
     this.node.appendChild(button);
 
     button.addEventListener('click', () => {
@@ -80,18 +81,36 @@ class metadataManagerWidget extends Widget {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
     });
+
+    // API Key field
+    const API_Key_label = document.createElement('label');
+    API_Key_label.textContent = 'API Key: ';
+    this.node.appendChild(API_Key_label);
+
+    const API_Key_input_field = document.createElement('input');
+    API_Key_input_field.type = 'text';
+    API_Key_input_field.placeholder = 'API Key';
+    this.node.appendChild(API_Key_input_field);
+    this.node.appendChild(document.createElement('br'));
+
+    // Publish button, no behaviour for now.
+    const publish_button = document.createElement('button');
+    publish_button.textContent = 'Publish';
+    this.node.appendChild(publish_button);
   }
 
   addItem(item: string, settings: ISettingRegistry.ISettings, cwd: string): void {
     // Put the item name first
     const itemLabel = document.createElement('label');
     itemLabel.textContent = item + ' ';
+    itemLabel.className = 'metadata-manager-widget-label';
     this.node.appendChild(itemLabel);
 
     // Add input field
     const inputField = document.createElement('input');
     inputField.type = 'text';
     inputField.placeholder = item;
+    inputField.className = 'metadata-manager-widget-input';
 
     const savedState = settings.get(cwd + '-' + item).composite as string;
     if (savedState !== null && savedState !== undefined) {
@@ -100,7 +119,6 @@ class metadataManagerWidget extends Widget {
 
     this.inputFields.push(inputField);
     this.node.appendChild(inputField);
-    this.node.appendChild(document.createElement('br'));
 
     // Add a listener to the input field
     inputField.addEventListener('change', () => {
@@ -240,7 +258,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
 
       const { commands } = app;
       commands.addCommand('metadatamanager:open', {
-        label: 'Open metadata manager Widget',
+        label: 'Metadata Manager',
         execute: () => {
           const widget = new metadataManagerWidget();
           widget.setUp(CWDHash, settings);

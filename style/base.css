@@ -3,3 +3,21 @@
 
     https://jupyterlab.readthedocs.io/en/stable/developer/css.html
 */
+
+.metadata-manager-widget-container {
+    display: grid;
+    grid-template-columns: auto 1fr; /* Two columns: auto for labels, 1fr for inputs */
+    gap: 0.5rem 1rem; /* Adjust the gap as needed */
+    padding: 1rem;
+    height: 100%;
+}
+
+.metadata-manager-widget-label {
+    justify-self: start;
+    align-self: center;
+}
+
+.metadata-manager-widget-input {
+    justify-self: stretch;
+    align-self: center;
+}
