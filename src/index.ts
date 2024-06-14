@@ -38,7 +38,10 @@ class metadataManagerWidget extends Widget {
   }
 
   // Set up the widget with the required items. Made async so it can access settings.
-  setUp(cwd: string, settings: ISettingRegistry.ISettings) {
+  setUp(cwd: string, settings: ISettingRegistry.ISettings, app: JupyterFrontEnd) {
+    // Set height for the widget to the height of the window. Very bootleg fix but setting values in css doesn't work.
+    this.node.style.height = window.innerHeight + 'px';
+
     // These are the important and required items, make a header for them to separate from the rest.
     const header = document.createElement('h2');
     header.textContent = 'Required Items:';
@@ -67,7 +70,6 @@ class metadataManagerWidget extends Widget {
     this.node.appendChild(button);
 
     button.addEventListener('click', () => {
-      console.log(this.toJSON(settings));
       // download the metadata as a json file
       const metadata = this.toJSON(settings);
       const metadataString = JSON.stringify(metadata, null, 2);
@@ -97,6 +99,24 @@ class metadataManagerWidget extends Widget {
     const publish_button = document.createElement('button');
     publish_button.textContent = 'Publish';
     this.node.appendChild(publish_button);
+    this.node.appendChild(document.createElement('br'));
+
+    // Create button that logs all files in the current directory.
+    const log_button = document.createElement('button');
+    log_button.textContent = 'Log Files';
+    this.node.appendChild(log_button);
+
+    log_button.addEventListener('click', async () => {
+      const filebrowser = app.serviceManager.contents;
+      const files = await filebrowser.get("./");
+
+      // Log content of all files in the current directory.
+      for (let file of files.content) {
+        console.log(file.name);
+        const filecontent = await filebrowser.get(file.path, { content: true });
+        console.log(filecontent.content);
+      }
+    });
   }
 
   addItem(item: string, settings: ISettingRegistry.ISettings, cwd: string): void {
@@ -110,8 +130,10 @@ class metadataManagerWidget extends Widget {
     const inputField = document.createElement('input');
     inputField.type = 'text';
     inputField.placeholder = item;
+    inputField.name = item;
     inputField.className = 'metadata-manager-widget-input';
 
+    // Load saved value
     const savedState = settings.get(cwd + '-' + item).composite as string;
     if (savedState !== null && savedState !== undefined) {
       inputField.value = savedState;
@@ -122,12 +144,8 @@ class metadataManagerWidget extends Widget {
 
     // Add a listener to the input field
     inputField.addEventListener('change', () => {
-      settings.set(cwd + '-' + inputField.placeholder, inputField.value);
+      settings.set(cwd + '-' + inputField.name, inputField.value);
     });
-  }
-
-  getInputValue(index: number): string {
-    return this.inputFields[index].value;
   }
 
   getInput(index: number): HTMLInputElement {
@@ -140,33 +158,46 @@ class metadataManagerWidget extends Widget {
 
   toJSON(settings: ISettingRegistry.ISettings): any {
     let obj: any = {};
+    // Set up RO-Crate metadata
+    obj["@context"] = "https://w3id.org/ro/crate/1.1/context";
+
+    // File descriptor
+    const filedescriptor = {
+      "@type": "CreativeWork",
+      "@id": "ro-crate-metadata.json",
+      "conformsTo": {"@id": "https://w3id.org/ro/crate/1.1"},
+      "about": {"@id": "./"}
+    };
+    obj["@graph"] = [filedescriptor];
+
     for (let i = 0; i < this.inputFields.length; i++) {
-      if (this.inputFields[i].placeholder.includes("license")) {
+      if (this.inputFields[i].name.includes("license")) {
         if (!obj["license"]) {
           obj["license"] = {};
         }
-        obj["license"][this.inputFields[i].placeholder] = this.inputFields[i].value;
+        obj["license"][this.inputFields[i].name] = this.inputFields[i].value;
         continue;
       }
       // If field is empty, ignore
       if (this.inputFields[i].value === '') {
         continue;
       }
-      obj[this.inputFields[i].placeholder] = this.inputFields[i].value;
+      obj[this.inputFields[i].name] = this.inputFields[i].value;
     }
 
-    // Loop over the checkboxes and add them to the object.
-    obj["keywords"] = {};
+    // Loop over the checkboxes and add them to an array
+    var keywords = [];
     const cwd = hash(PageConfig.getOption('serverRoot'));
     for (let tag of tagslist) {
       for (let tagname of tag.get_tags()) {
         const tagvar = cwd + tagname;
         let savedState = settings.get(tagvar).composite as boolean;
         if (savedState !== undefined && savedState !== null && savedState !== false) {
-          obj["keywords"][tagname] = savedState;
+          keywords.push(tagname);
         }
       }
     }
+    if (keywords.length > 0) obj["keywords"] = keywords;
     return obj;
   }
 }
@@ -261,7 +292,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
         label: 'Metadata Manager',
         execute: () => {
           const widget = new metadataManagerWidget();
-          widget.setUp(CWDHash, settings);
+          widget.setUp(CWDHash, settings, app);
 
           // Focus on the new window.
           app.shell.add(widget, 'main');
