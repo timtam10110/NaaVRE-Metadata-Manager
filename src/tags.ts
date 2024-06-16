@@ -79,7 +79,7 @@ const General = new Tags("General", generaltags);
 export const tagslist = [Physics, Mathematics, ComputerScience, Biology, Economics, Statistics, ElectricalEngineering, General];
 
 export var required_metadata = [
-    "title", "upload_type", "publication_type", "image_type", "creators", "description", "access_right", "license_id", "license_title", "license_url", "embargo_date"
+    "title", "upload_type", "publication_type", "image_type", "creator", "description", "access_right", "license_id", "license_title", "license_url", "embargo_date"
 ]
 
 export var optional_metadata = [

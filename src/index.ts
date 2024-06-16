@@ -14,6 +14,17 @@ import { CheckboxButton, CheckboxButtonHolder } from './checkbox';
 import '../style/index.css';
 
 
+
+function escapeSpecialCharacters(str: string): string {
+  const encoded = encodeURIComponent(str);
+  const decoded = encoded
+  .replace(/%2E/g, '.')  // Do not encode the dot character (.)
+  .replace(/%2F/g, '/');  // Do not encode the slash character (/)
+
+  return decoded;
+}
+
+
 function hash(item: string): string {
   let hash = 0;
   if (item.length == 0) return hash.toString();
@@ -28,29 +39,35 @@ function hash(item: string): string {
 
 class metadataManagerWidget extends Widget {
   private inputFields: HTMLInputElement[] = [];
+  private app: JupyterFrontEnd;
+  private cwdhash: string;
+  private settings: ISettingRegistry.ISettings;
 
-  constructor() {
+  constructor(app: JupyterFrontEnd, cwd: string, settings: ISettingRegistry.ISettings) {
     super();
     this.id = "metadataManagerWidget";
     this.title.label = 'Metadata Manager';
     this.title.closable = true;
     this.addClass('metadata-manager-widget-container');
+    this.app = app;
+    this.cwdhash = hash(cwd);
+    this.settings = settings;
   }
 
-  // Set up the widget with the required items. Made async so it can access settings.
-  setUp(cwd: string, settings: ISettingRegistry.ISettings, app: JupyterFrontEnd) {
-    // Set height for the widget to the height of the window. Very bootleg fix but setting values in css doesn't work.
+  // Set up the widget with the required items.
+  setUp() {
+    // Set height for the widget to the height of the window. Very bad fix but setting values in css doesn't work.
     this.node.style.height = window.innerHeight + 'px';
 
     // These are the important and required items, make a header for them to separate from the rest.
     const header = document.createElement('h2');
     header.textContent = 'Required Items:';
     this.node.appendChild(header);
-    this.node.appendChild(document.createElement('br'));
+    this.node.appendChild(document.createElement('br'));  // Line break to fill empty space in grid.
 
     const itemsToAdd = required_metadata;
     for (let item of itemsToAdd) {
-      this.addItem(item, settings, cwd);
+      this.addItem(item);
     }
 
     // These are the optional items, make a header for them to separate from the rest.
@@ -61,7 +78,7 @@ class metadataManagerWidget extends Widget {
 
     const optionalItemsToAdd = optional_metadata;
     for (let item of optionalItemsToAdd) {
-      this.addItem(item, settings, cwd);
+      this.addItem(item);
     }
     this.node.appendChild(document.createElement('br'));
 
@@ -69,15 +86,15 @@ class metadataManagerWidget extends Widget {
     button.textContent = 'Export Metadata';
     this.node.appendChild(button);
 
-    button.addEventListener('click', () => {
-      // download the metadata as a json file
-      const metadata = this.toJSON(settings);
+    button.addEventListener('click', async () => {
+      // download the metadata as a json file.
+      const metadata = await this.toROCrateJSON();
       const metadataString = JSON.stringify(metadata, null, 2);
       const blob = new Blob([metadataString], {type: "application/json"});
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = "metadata.json";
+      a.download = "ro-crate-metadata.json";
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -106,20 +123,20 @@ class metadataManagerWidget extends Widget {
     log_button.textContent = 'Log Files';
     this.node.appendChild(log_button);
 
-    log_button.addEventListener('click', async () => {
-      const filebrowser = app.serviceManager.contents;
-      const files = await filebrowser.get("./");
+    var allfiles: any[] = [];
 
-      // Log content of all files in the current directory.
-      for (let file of files.content) {
-        console.log(file.name);
-        const filecontent = await filebrowser.get(file.path, { content: true });
-        console.log(filecontent.content);
-      }
+    log_button.addEventListener('click', async () => {
+      allfiles = await this.getAllFiles("", []);
+      console.log(allfiles);
     });
   }
 
-  addItem(item: string, settings: ISettingRegistry.ISettings, cwd: string): void {
+  reset(): void {
+    this.node.innerHTML = '';
+    this.inputFields = [];
+  }
+
+  addItem(item: string): void {
     // Put the item name first
     const itemLabel = document.createElement('label');
     itemLabel.textContent = item + ' ';
@@ -134,7 +151,7 @@ class metadataManagerWidget extends Widget {
     inputField.className = 'metadata-manager-widget-input';
 
     // Load saved value
-    const savedState = settings.get(cwd + '-' + item).composite as string;
+    const savedState = this.settings.get(this.cwdhash + '-' + item).composite as string;
     if (savedState !== null && savedState !== undefined) {
       inputField.value = savedState;
     }
@@ -144,7 +161,7 @@ class metadataManagerWidget extends Widget {
 
     // Add a listener to the input field
     inputField.addEventListener('change', () => {
-      settings.set(cwd + '-' + inputField.name, inputField.value);
+      this.settings.set(this.cwdhash + '-' + inputField.name, inputField.value);
     });
   }
 
@@ -156,48 +173,161 @@ class metadataManagerWidget extends Widget {
     return this.inputFields.length;
   }
 
-  toJSON(settings: ISettingRegistry.ISettings): any {
+  getFromInputName(name: string): string {
+    for (let input of this.inputFields) {
+      if (input.name === name) {
+        return input.value;
+      }
+    }
+    return '';
+  }
+
+  async getAllFiles(currentpath: string, allFiles: any[]): Promise<any[]> {
+    let filesList: any[] = [];
+    const filebrowser = this.app.serviceManager.contents;
+    const files = await filebrowser.get("./" + currentpath);
+    for (let file of files.content) {
+      filesList.push(file);
+    }
+    allFiles = allFiles.concat(filesList);
+    for (let file of filesList) {
+      if (file.type === "directory") {
+        allFiles = await this.getAllFiles(currentpath + file.name + "/", allFiles);
+      }
+    }
+    return allFiles;
+  }
+
+  async getAllFileNames(): Promise<string[]> {
+    let fileNames: string[] = [];
+    const filebrowser = this.app.serviceManager.contents;
+    const files = await filebrowser.get("./");
+    for (let file of files.content) {
+      fileNames.push(file.name);
+    }
+    return fileNames;
+  }
+
+  async getAllFileContents(): Promise<string[]> {
+    let fileContents: string[] = [];
+    const filebrowser = this.app.serviceManager.contents;
+    const files = await filebrowser.get("./");
+    for (let file of files.content) {
+      const filecontent = await filebrowser.get(file.path, { content: true });
+      fileContents.push(filecontent.content);
+    }
+    return fileContents;
+  }
+
+  async getAllFileTypes(): Promise<string[]> {
+    let fileTypes: string[] = [];
+    const filebrowser = this.app.serviceManager.contents;
+    const files = await filebrowser.get("./");
+    for (let file of files.content) {
+      fileTypes.push(file.type);
+    }
+    return fileTypes;
+  }
+
+  async toROCrateJSON(): Promise<any> {
     let obj: any = {};
     // Set up RO-Crate metadata
     obj["@context"] = "https://w3id.org/ro/crate/1.1/context";
+
+    // Loop over the checkboxes and add them to an array
+    var keywords = [];
+    for (let tag of tagslist) {
+      for (let tagname of tag.get_tags()) {
+        const tagvar = this.cwdhash + tagname;
+        let savedState = this.settings.get(tagvar).composite as boolean;
+        if (savedState !== undefined && savedState !== null && savedState !== false) {
+          keywords.push(tagname);
+        }
+      }
+    }
 
     // File descriptor
     const filedescriptor = {
       "@type": "CreativeWork",
       "@id": "ro-crate-metadata.json",
       "conformsTo": {"@id": "https://w3id.org/ro/crate/1.1"},
-      "about": {"@id": "./"}
+      "about": {"@id": "./"},
+      "keywords": keywords  // Keywords apply to all files, so put them here once instead of repeating over and over.
     };
-    obj["@graph"] = [filedescriptor];
 
-    for (let i = 0; i < this.inputFields.length; i++) {
-      if (this.inputFields[i].name.includes("license")) {
-        if (!obj["license"]) {
-          obj["license"] = {};
-        }
-        obj["license"][this.inputFields[i].name] = this.inputFields[i].value;
-        continue;
+    const allfiles = await this.getAllFiles("", []);
+    const allfilepaths = allfiles.map((file: any) => file.path);
+
+    // First, the root directory
+    const root = {
+      "@id": "./",
+      "@type": "Dataset",
+      "hasPart": allfilepaths.map((path: string) => {
+        return {"@id": escapeSpecialCharacters(path)};
+      })
+    };
+
+    // Then, all the folders
+    var folders = [];
+    for (let file of allfiles) {
+      if (file.type === "directory") {
+        const filesInFolder = await this.getAllFiles(file.path + "/", []);
+        const filenamesInFolder = filesInFolder.map((file: any) => file.path);
+        var folder;
+
+        if (filesInFolder.length === 0) { // If the folder is empty, do not include hasPart.
+          folder = {
+            "@id": file.path + "/",
+            "@type": "Dataset"
+          };
+        } else {
+          folder = {
+            "@id": file.path + "/",
+            "@type": "Dataset",
+            "hasPart": filenamesInFolder.map((path: string) => {
+              return {"@id": escapeSpecialCharacters(path)};
+            })
+          };
+        };
+        folders.push(folder);
       }
-      // If field is empty, ignore
-      if (this.inputFields[i].value === '') {
-        continue;
-      }
-      obj[this.inputFields[i].name] = this.inputFields[i].value;
     }
 
-    // Loop over the checkboxes and add them to an array
-    var keywords = [];
-    const cwd = hash(PageConfig.getOption('serverRoot'));
-    for (let tag of tagslist) {
-      for (let tagname of tag.get_tags()) {
-        const tagvar = cwd + tagname;
-        let savedState = settings.get(tagvar).composite as boolean;
-        if (savedState !== undefined && savedState !== null && savedState !== false) {
-          keywords.push(tagname);
-        }
+    // Collect general information
+    const license = this.getFromInputName("license_url");
+    const creator = this.getFromInputName("creator");
+    const creator_firstname = creator.slice(0, creator.indexOf(" "));
+
+    const creator_val = {
+      "@id": "#" + (creator_firstname.length > 0 ? creator_firstname : "Unknown"),
+      "@type": "Person",
+      "name": creator.length > 0 ? creator : "Unknown"
+    };
+
+    // Finally, all the files
+    var files = [];
+    for (let file of allfiles) {
+      if (file.type === "file") {
+        const filecontent = await this.app.serviceManager.contents.get(file.path, { content: true });
+        const fileinfo = {
+          "@id": escapeSpecialCharacters(file.path),
+          "@type": "File",
+          "name": file.name,
+          "contentSize": filecontent.content.length,
+          "dateCreated": file.created,
+          "dateModified": file.last_modified,
+          "encodingFormat": file.mimetype,
+          "license": {"@id": license},
+          "author": {"@id": "#" + creator_firstname}
+        };
+        files.push(fileinfo);
       }
     }
-    if (keywords.length > 0) obj["keywords"] = keywords;
+
+    obj["@graph"] = [filedescriptor, root];
+    obj["@graph"] = obj["@graph"].concat(folders);
+    obj["@graph"] = obj["@graph"].concat(files);
+    obj["@graph"] = obj["@graph"].concat([creator_val]);
     return obj;
   }
 }
@@ -291,8 +421,8 @@ const plugin: JupyterFrontEndPlugin<void> = {
       commands.addCommand('metadatamanager:open', {
         label: 'Metadata Manager',
         execute: () => {
-          const widget = new metadataManagerWidget();
-          widget.setUp(CWDHash, settings, app);
+          const widget = new metadataManagerWidget(app, CWD, settings);
+          widget.setUp();
 
           // Focus on the new window.
           app.shell.add(widget, 'main');
