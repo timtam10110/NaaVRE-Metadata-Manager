@@ -13,7 +13,10 @@ import { tagslist, required_metadata, optional_metadata } from './tags';
 import { CheckboxButton, CheckboxButtonHolder } from './checkbox';
 import '../style/index.css';
 
-
+var metadata_items = {
+  "Required items": required_metadata,
+  "Custom items": optional_metadata
+}
 
 function escapeSpecialCharacters(str: string): string {
   const encoded = encodeURIComponent(str);
@@ -37,6 +40,38 @@ function hash(item: string): string {
 }
 
 
+function downloadJSON(json: any, name: string): void {
+  const jsonString = JSON.stringify(json, null, 2);
+  const blob = new Blob([jsonString], {type: "application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  window.URL.revokeObjectURL(url);
+  document.body.removeChild(a);
+}
+
+
+function openFileDialog(): Promise<File | null> {
+  return new Promise((resolve, reject) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.onchange = () => {
+      if (input.files !== null && input.files.length > 0) {
+        resolve(input.files[0]);
+      } else {
+        resolve(null);
+      }
+    };
+    input.click();
+  });
+
+}
+
+
 class metadataManagerWidget extends Widget {
   private inputFields: HTMLInputElement[] = [];
   private app: JupyterFrontEnd;
@@ -50,7 +85,7 @@ class metadataManagerWidget extends Widget {
     this.title.closable = true;
     this.addClass('metadata-manager-widget-container');
     this.app = app;
-    this.cwdhash = hash(cwd);
+    this.cwdhash = cwd;
     this.settings = settings;
   }
 
@@ -59,81 +94,135 @@ class metadataManagerWidget extends Widget {
     // Set height for the widget to the height of the window. Very bad fix but setting values in css doesn't work.
     this.node.style.height = window.innerHeight + 'px';
 
-    // These are the important and required items, make a header for them to separate from the rest.
-    const header = document.createElement('h2');
-    header.textContent = 'Required Items:';
-    this.node.appendChild(header);
-    this.node.appendChild(document.createElement('br'));  // Line break to fill empty space in grid.
+    // Loop over the items and add them to the widget.
+    Object.entries(metadata_items).forEach(([header, items]) => {
+      this.addHeaderAndItems(header, items);
+    });
 
-    const itemsToAdd = required_metadata;
-    for (let item of itemsToAdd) {
-      this.addItem(item);
-    }
-
-    // These are the optional items, make a header for them to separate from the rest.
-    const optionalHeader = document.createElement('h2');
-    optionalHeader.textContent = 'Optional Items:';
-    this.node.appendChild(optionalHeader);
     this.node.appendChild(document.createElement('br'));
-
-    const optionalItemsToAdd = optional_metadata;
-    for (let item of optionalItemsToAdd) {
-      this.addItem(item);
-    }
-    this.node.appendChild(document.createElement('br'));
-
     const button = document.createElement('button');
-    button.textContent = 'Export Metadata';
+    button.textContent = 'Export Metadata to RO Crate';
     this.node.appendChild(button);
 
     button.addEventListener('click', async () => {
-      // download the metadata as a json file.
-      const metadata = await this.toROCrateJSON();
-      const metadataString = JSON.stringify(metadata, null, 2);
-      const blob = new Blob([metadataString], {type: "application/json"});
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = "ro-crate-metadata.json";
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      downloadJSON(await this.toROCrateJSON(), "ro-crate-metadata.json");
     });
 
-    // API Key field
-    const API_Key_label = document.createElement('label');
-    API_Key_label.textContent = 'API Key: ';
-    this.node.appendChild(API_Key_label);
-
-    const API_Key_input_field = document.createElement('input');
-    API_Key_input_field.type = 'text';
-    API_Key_input_field.placeholder = 'API Key';
-    this.node.appendChild(API_Key_input_field);
     this.node.appendChild(document.createElement('br'));
-
-    // Publish button, no behaviour for now.
-    const publish_button = document.createElement('button');
-    publish_button.textContent = 'Publish';
-    this.node.appendChild(publish_button);
-    this.node.appendChild(document.createElement('br'));
-
-    // Create button that logs all files in the current directory.
     const log_button = document.createElement('button');
-    log_button.textContent = 'Log Files';
+    log_button.textContent = 'Push Metadata To MongoDB';
     this.node.appendChild(log_button);
 
-    var allfiles: any[] = [];
-
     log_button.addEventListener('click', async () => {
-      allfiles = await this.getAllFiles("", []);
-      console.log(allfiles);
+      const metadata = await this.toROCrateJSON();
+      console.log(metadata);
+
+      try {
+        const response = await fetch("http://localhost:5000/api/insert", {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(metadata)
+        });
+
+        if (!response.ok) {
+          console.error('Failed to log metadata to the server.');
+        }
+
+        const data = await response.json();
+        console.log(data);
+      } catch (error) {
+        console.error('Failed to log metadata to the server.', error);
+      }
+    });
+
+    this.node.appendChild(document.createElement('br'));
+
+    // Add button to export all current fields, not the values. Essentially, export the schematic.
+    const exportButton = document.createElement('button');
+    exportButton.textContent = 'Export Schematic';
+    this.node.appendChild(exportButton);
+
+    exportButton.addEventListener('click', async () => {
+      downloadJSON(this.exportSchematic(), "metadata-schematic.json");
+    });
+
+    this.node.appendChild(document.createElement('br'));
+
+    // Add button to import a schematic. This will overwrite all current fields.
+    const importButton = document.createElement('button');
+    importButton.textContent = 'Import Schematic';
+    this.node.appendChild(importButton);
+
+    importButton.addEventListener('click', async () => {
+      const file = await openFileDialog();
+      if (file !== null) {
+        const reader = new FileReader();
+        reader.onload = async () => {
+          const schematic = JSON.parse(reader.result as string);
+          this.importSchematic(schematic);
+        };
+        reader.readAsText(file);
+      } else {
+        console.error('No file selected.');
+      }
     });
   }
 
   reset(): void {
-    this.node.innerHTML = '';
-    this.inputFields = [];
+    // Close the current window and open a new one, with everything set up anew. Not the cleanest method, but certainly the easiest.
+    const widget = new metadataManagerWidget(this.app, this.cwdhash, this.settings);
+    widget.setUp();
+
+    // Focus on the new window.
+    this.app.shell.add(widget, 'main');
+    this.app.shell.currentWidget?.close();
+    this.app.shell.activateById(widget.id);
+  }
+
+  exportSchematic(): any {
+    let schematic: any = {};
+    let currentHeader: string = '';
+    let currentList: string[] = [];
+    for (let node of this.node.childNodes) {
+      if (node.nodeName === 'H2') {
+        if (currentHeader !== '') {
+          schematic[currentHeader] = currentList;             // Push current header and items into the schematic.
+        }
+        currentHeader = node.textContent?.trim() as string;   // Set the new header.
+        currentList = [];
+      } else if (node.nodeName === 'LABEL') {
+        currentList.push(node.textContent?.trim() as string); // Add the item to the list.
+      }
+    }
+    schematic[currentHeader] = currentList;                   // Push the last header and items into the schematic.
+    return schematic;
+  }
+
+  importSchematic(schematic: any): void {
+    let requiredItems = metadata_items["Required items"]; // Ensures that the required items are always present.
+    let new_metadata_items: any = {};
+    new_metadata_items["Required items"] = requiredItems;
+    for (let header of Object.keys(schematic)) {
+      if (header === "Required items") {
+        continue;
+      }
+      new_metadata_items[header] = schematic[header];
+    }
+    metadata_items = new_metadata_items;
+    this.reset();
+  }
+
+  addHeaderAndItems(header: string, items: string[]): void {
+    const headerElement = document.createElement('h2');
+    headerElement.textContent = header;
+    this.node.appendChild(headerElement);
+    this.node.appendChild(document.createElement('br'));
+
+    for (let item of items) {
+      this.addItem(item);
+    }
   }
 
   addItem(item: string): void {
@@ -229,10 +318,47 @@ class metadataManagerWidget extends Widget {
     return fileTypes;
   }
 
+  async fromROCrateJSON(obj: any): Promise<void> {
+    // Set up RO-Crate metadata
+    const graph = obj["@graph"];
+    const filedescriptor = graph[0];
+    // Folders have the type dataset, but do not carry information to be stored.
+    // Files have the type file, and do have information to be stored.
+
+    // Set metadata both in the current widget, and in the settingRegistry.
+
+    // Set keywords and update the checkboxes. (Worst case scenario, ask user to refresh jupyterlab, but should be doable without.)
+    const keywords = filedescriptor.keywords;
+    for (let keyword of keywords) {
+      for (let tag of tagslist) {
+        for (let tagname of tag.get_tags()) {
+          if (tagname === keyword) {
+            this.settings.set(this.cwdhash + tagname, true);
+          } else { // If tag is not in the list, set it to false.
+            this.settings.set(this.cwdhash + tagname, false);
+          }
+        }
+      }
+    }
+  }
+
   async toROCrateJSON(): Promise<any> {
     let obj: any = {};
-    // Set up RO-Crate metadata
-    obj["@context"] = "https://w3id.org/ro/crate/1.1/context";
+
+    // Load context json file from internet
+    const context_url = "https://w3id.org/ro/crate/1.1/context";
+    const context_response = await fetch(context_url);
+    const context_json = await context_response.json();
+    const items = context_json["@context"];
+
+    // Loop over all input field labels, and if the label is not in the context, add it as a new item.
+    let new_items: any = {};
+    for (let item of this.inputFields) {
+      if (items[item.name] === undefined && item.name !== "license_url") {
+        new_items[item.name] = item.name;
+      }
+    }
+    obj["@context"] = [context_url, new_items]
 
     // Loop over the checkboxes and add them to an array
     var keywords = [];
@@ -253,6 +379,7 @@ class metadataManagerWidget extends Widget {
       "conformsTo": {"@id": "https://w3id.org/ro/crate/1.1"},
       "about": {"@id": "./"},
       "keywords": keywords  // Keywords apply to all files, so put them here once instead of repeating over and over.
+      // Technically a lot of other things are shared between files as well. This is just an arbitrary decision, can be changed later.
     };
 
     const allfiles = await this.getAllFiles("", []);
@@ -307,19 +434,26 @@ class metadataManagerWidget extends Widget {
     // Finally, all the files
     var files = [];
     for (let file of allfiles) {
-      if (file.type === "file") {
+      if (file.type === "file" || file.type === "notebook") {
         const filecontent = await this.app.serviceManager.contents.get(file.path, { content: true });
-        const fileinfo = {
+        const fileinfo: any = {
           "@id": escapeSpecialCharacters(file.path),
           "@type": "File",
           "name": file.name,
           "contentSize": filecontent.content.length,
           "dateCreated": file.created,
           "dateModified": file.last_modified,
-          "encodingFormat": file.mimetype,
-          "license": {"@id": license},
+          "encodingFormat": file.type === "notebook" ? "application/jupyter+json" : file.mimetype,
+          "license": {"@id": license.length > 0 ? license : "https://creativecommons.org/publicdomain/zero/1.0/"},
           "author": {"@id": "#" + creator_firstname}
         };
+
+        // Loop over new_items and add them to the fileinfo
+        for (let item of this.inputFields) {
+          if (items[item.name] === undefined && item.name !== "license_url" && item.name !== "creator" && item.value.length > 0) {
+            fileinfo[item.name] = item.value;
+          }
+        }
         files.push(fileinfo);
       }
     }
@@ -334,11 +468,11 @@ class metadataManagerWidget extends Widget {
 
 
 /**
- * Initialization data for the metadata manager extension.
+ * Initialization data for the jupyter-lab-metadata-manager extension.
  */
 const plugin: JupyterFrontEndPlugin<void> = {
-  id: 'naavre-extension:plugin',
-  description: 'A NaaVRE extension for managing metadata',
+  id: 'jupyter-lab-metadata-manager:plugin',
+  description: 'A Jupyter Lab extension for managing metadata',
   autoStart: true,
   optional: [ISettingRegistry, ILauncher],
   activate: async (app: JupyterFrontEnd, settingRegistry: ISettingRegistry | null, launcher: ILauncher) => {
@@ -421,7 +555,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
       commands.addCommand('metadatamanager:open', {
         label: 'Metadata Manager',
         execute: () => {
-          const widget = new metadataManagerWidget(app, CWD, settings);
+          const widget = new metadataManagerWidget(app, CWDHash, settings);
           widget.setUp();
 
           // Focus on the new window.

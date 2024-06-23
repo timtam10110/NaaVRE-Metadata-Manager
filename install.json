@@ -1,5 +1,5 @@
 {
   "packageManager": "python",
-  "packageName": "naavre_extension",
-  "uninstallInstructions": "Use your Python package manager (pip, conda, etc.) to uninstall the package naavre_extension"
+  "packageName": "jupyter_lab_metadata_manager",
+  "uninstallInstructions": "Use your Python package manager (pip, conda, etc.) to uninstall the package jupyter_lab_metadata_manager"
 }

@@ -1,7 +1,7 @@
 {
-    "name": "naavre-extension",
-    "version": "0.5.0",
-    "description": "A NaaVRE extension for managing metadata",
+    "name": "jupyter-lab-metadata-manager",
+    "version": "0.6.0",
+    "description": "A Jupyter Lab extension for managing metadata",
     "keywords": [
         "jupyter",
         "jupyterlab",
@@ -39,7 +39,7 @@
         "clean": "jlpm clean:lib",
         "clean:lib": "rimraf lib tsconfig.tsbuildinfo",
         "clean:lintcache": "rimraf .eslintcache .stylelintcache",
-        "clean:labextension": "rimraf naavre_extension/labextension naavre_extension/_version.py",
+        "clean:labextension": "rimraf jupyter_lab_metadata_manager/labextension jupyter_lab_metadata_manager/_version.py",
         "clean:all": "jlpm clean:lib && jlpm clean:labextension && jlpm clean:lintcache",
         "eslint": "jlpm eslint:check --fix",
         "eslint:check": "eslint . --cache --ext .ts,.tsx",
@@ -94,7 +94,7 @@
     },
     "jupyterlab": {
         "extension": true,
-        "outputDir": "naavre_extension/labextension",
+        "outputDir": "jupyter_lab_metadata_manager/labextension",
         "schemaDir": "schema"
     },
     "eslintIgnore": [

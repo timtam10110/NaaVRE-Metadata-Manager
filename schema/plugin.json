@@ -1,7 +1,7 @@
 {
   "jupyter.lab.shortcuts": [],
-  "title": "naavre-extension",
-  "description": "naavre-extension settings.",
+  "title": "jupyter-lab-metadata-manager",
+  "description": "jupyter-lab-metadata-manager settings.",
   "type": "object",
   "properties": {},
   "additionalProperties": true

@@ -3,7 +3,7 @@ requires = ["hatchling>=1.5.0", "jupyterlab>=4.0.0,<5", "hatch-nodejs-version>=0
 build-backend = "hatchling.build"
 
 [project]
-name = "naavre_extension"
+name = "jupyter_lab_metadata_manager"
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.8"
@@ -33,24 +33,24 @@ source = "nodejs"
 fields = ["description", "authors", "urls"]
 
 [tool.hatch.build.targets.sdist]
-artifacts = ["naavre_extension/labextension"]
+artifacts = ["jupyter_lab_metadata_manager/labextension"]
 exclude = [".github", "binder"]
 
 [tool.hatch.build.targets.wheel.shared-data]
-"naavre_extension/labextension" = "share/jupyter/labextensions/naavre-extension"
-"install.json" = "share/jupyter/labextensions/naavre-extension/install.json"
+"jupyter_lab_metadata_manager/labextension" = "share/jupyter/labextensions/jupyter-lab-metadata-manager"
+"install.json" = "share/jupyter/labextensions/jupyter-lab-metadata-manager/install.json"
 
 [tool.hatch.build.hooks.version]
-path = "naavre_extension/_version.py"
+path = "jupyter_lab_metadata_manager/_version.py"
 
 [tool.hatch.build.hooks.jupyter-builder]
 dependencies = ["hatch-jupyter-builder>=0.5"]
 build-function = "hatch_jupyter_builder.npm_builder"
 ensured-targets = [
-    "naavre_extension/labextension/static/style.js",
-    "naavre_extension/labextension/package.json",
+    "jupyter_lab_metadata_manager/labextension/static/style.js",
+    "jupyter_lab_metadata_manager/labextension/package.json",
 ]
-skip-if-exists = ["naavre_extension/labextension/static/style.js"]
+skip-if-exists = ["jupyter_lab_metadata_manager/labextension/static/style.js"]
 
 [tool.hatch.build.hooks.jupyter-builder.build-kwargs]
 build_cmd = "build:prod"
@@ -60,7 +60,7 @@ npm = ["jlpm"]
 build_cmd = "install:extension"
 npm = ["jlpm"]
 source_dir = "src"
-build_dir = "naavre_extension/labextension"
+build_dir = "jupyter_lab_metadata_manager/labextension"
 
 [tool.jupyter-releaser.options]
 version_cmd = "hatch version"

@@ -1,10 +1,10 @@
 {
     "type": "object",
     "properties": {
-        "Theory": {
+        "Simulation": {
             "type": "boolean",
             "default": false,
-            "description": "Test state of checkbox."
+            "description": "The state of checkbox."
         }
     },
     "additionalProperties": true

@@ -1,8 +1,8 @@
-# naavre_extension
+# jupyter_lab_metadata_manager
 
 [![Github Actions Status](/workflows/Build/badge.svg)](/actions/workflows/build.yml)
 
-A NaaVRE extension for managing metadata
+A Jupyter Lab extension for managing metadata
 
 ## Requirements
 
@@ -13,7 +13,7 @@ A NaaVRE extension for managing metadata
 To install the extension, execute:
 
 ```bash
-pip install naavre_extension
+pip install jupyter_lab_metadata_manager
 ```
 
 ## Uninstall
@@ -21,7 +21,7 @@ pip install naavre_extension
 To remove the extension, execute:
 
 ```bash
-pip uninstall naavre_extension
+pip uninstall jupyter_lab_metadata_manager
 ```
 
 ## Contributing
@@ -36,7 +36,7 @@ The `jlpm` command is JupyterLab's pinned version of
 
 ```bash
 # Clone the repo to your local environment
-# Change directory to the naavre_extension directory
+# Change directory to the jupyter_lab_metadata_manager directory
 # Install package in development mode
 pip install -e "."
 # Link your development version of the extension with JupyterLab
@@ -65,12 +65,12 @@ jupyter lab build --minimize=False
 ### Development uninstall
 
 ```bash
-pip uninstall naavre_extension
+pip uninstall jupyter_lab_metadata_manager
 ```
 
 In development mode, you will also need to remove the symlink created by `jupyter labextension develop`
 command. To find its location, you can run `jupyter labextension list` to figure out where the `labextensions`
-folder is located. Then you can remove the symlink named `naavre-extension` within that folder.
+folder is located. Then you can remove the symlink named `jupyter-lab-metadata-manager` within that folder.
 
 ### Packaging the extension
 

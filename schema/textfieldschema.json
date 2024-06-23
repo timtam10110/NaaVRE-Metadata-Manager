@@ -1,10 +1,10 @@
 {
     "type": "object",
     "properties": {
-        "Item1": {
+        "Inputfield": {
             "type": "string",
             "default": "empty",
-            "description": "item value"
+            "description": "Inputfield stored value."
         }
     },
     "additionalProperties": true
