@@ -68,7 +68,6 @@ function openFileDialog(): Promise<File | null> {
     };
     input.click();
   });
-
 }
 
 
@@ -100,40 +99,30 @@ class metadataManagerWidget extends Widget {
     });
 
     this.node.appendChild(document.createElement('br'));
-    const button = document.createElement('button');
-    button.textContent = 'Export Metadata to RO Crate';
-    this.node.appendChild(button);
+    const ROCrateExportButton = document.createElement('button');
+    ROCrateExportButton.textContent = 'Export Metadata to RO Crate';
+    this.node.appendChild(ROCrateExportButton);
 
-    button.addEventListener('click', async () => {
+    ROCrateExportButton.addEventListener('click', async () => {
       downloadJSON(await this.toROCrateJSON(), "ro-crate-metadata.json");
     });
 
     this.node.appendChild(document.createElement('br'));
-    const log_button = document.createElement('button');
-    log_button.textContent = 'Push Metadata To MongoDB';
-    this.node.appendChild(log_button);
+    const ROCrateImportButton = document.createElement('button');
+    ROCrateImportButton.textContent = 'Import Metadata from RO Crate';
+    this.node.appendChild(ROCrateImportButton);
 
-    log_button.addEventListener('click', async () => {
-      const metadata = await this.toROCrateJSON();
-      console.log(metadata);
-
-      try {
-        const response = await fetch("http://localhost:5000/api/insert", {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(metadata)
-        });
-
-        if (!response.ok) {
-          console.error('Failed to log metadata to the server.');
-        }
-
-        const data = await response.json();
-        console.log(data);
-      } catch (error) {
-        console.error('Failed to log metadata to the server.', error);
+    ROCrateImportButton.addEventListener('click', async () => {
+      const file = await openFileDialog();
+      if (file !== null) {
+        const reader = new FileReader();
+        reader.onload = async () => {
+          const obj = JSON.parse(reader.result as string);
+          this.fromROCrateJSON(obj);
+        };
+        reader.readAsText(file);
+      } else {
+        console.error('No file selected.');
       }
     });
 
@@ -166,6 +155,52 @@ class metadataManagerWidget extends Widget {
         reader.readAsText(file);
       } else {
         console.error('No file selected.');
+      }
+    });
+
+    const url_label = document.createElement('label');
+    url_label.textContent = 'API Insert URL';
+    url_label.className = 'metadata-manager-widget-label';
+    this.node.appendChild(url_label);
+
+    const url_input = document.createElement('input');
+    url_input.type = 'text';
+    url_input.placeholder = 'default URL is http://localhost:5000/api/insert';
+    url_input.name = 'API Insert URL';
+    url_input.className = 'metadata-manager-widget-input';
+    this.node.appendChild(url_input);
+
+    this.node.appendChild(document.createElement('br'));
+    const log_button = document.createElement('button');
+    log_button.textContent = 'Push Metadata To MongoDB';
+    this.node.appendChild(log_button);
+
+    log_button.addEventListener('click', async () => {
+      // Get url from input field
+      let url = url_input.value;
+      if (url === '') {
+        console.warn('No MongoDB URL provided. Using default URL (http://localhost:5000/api/insert)');
+        url = 'http://localhost:5000/api/insert';
+      }
+
+      const metadata = await this.toROCrateJSON();
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(metadata)
+        });
+
+        if (!response.ok) {
+          console.error('Failed to log metadata to the server.');
+        }
+
+        const data = await response.json();
+        console.log(data["id"]);
+      } catch (error) {
+        console.error('Failed to log metadata to the server.', error);
       }
     });
   }
@@ -254,14 +289,6 @@ class metadataManagerWidget extends Widget {
     });
   }
 
-  getInput(index: number): HTMLInputElement {
-    return this.inputFields[index];
-  }
-
-  getItemsLength(): number {
-    return this.inputFields.length;
-  }
-
   getFromInputName(name: string): string {
     for (let input of this.inputFields) {
       if (input.name === name) {
@@ -287,59 +314,40 @@ class metadataManagerWidget extends Widget {
     return allFiles;
   }
 
-  async getAllFileNames(): Promise<string[]> {
-    let fileNames: string[] = [];
-    const filebrowser = this.app.serviceManager.contents;
-    const files = await filebrowser.get("./");
-    for (let file of files.content) {
-      fileNames.push(file.name);
-    }
-    return fileNames;
-  }
-
-  async getAllFileContents(): Promise<string[]> {
-    let fileContents: string[] = [];
-    const filebrowser = this.app.serviceManager.contents;
-    const files = await filebrowser.get("./");
-    for (let file of files.content) {
-      const filecontent = await filebrowser.get(file.path, { content: true });
-      fileContents.push(filecontent.content);
-    }
-    return fileContents;
-  }
-
-  async getAllFileTypes(): Promise<string[]> {
-    let fileTypes: string[] = [];
-    const filebrowser = this.app.serviceManager.contents;
-    const files = await filebrowser.get("./");
-    for (let file of files.content) {
-      fileTypes.push(file.type);
-    }
-    return fileTypes;
-  }
-
   async fromROCrateJSON(obj: any): Promise<void> {
     // Set up RO-Crate metadata
     const graph = obj["@graph"];
     const filedescriptor = graph[0];
-    // Folders have the type dataset, but do not carry information to be stored.
-    // Files have the type file, and do have information to be stored.
 
-    // Set metadata both in the current widget, and in the settingRegistry.
+    let filedone = false;
+    for (let file of graph) {
+      if (file["@type"] === "File" && !filedone) {
+        // Store the metadata in the settings if it is in the list of input fields.
+        for (let key of Object.keys(file)) {
+          if (key !== "@id" && key !== "@type" && key !== "name" && key !== "contentSize" && key !== "dateCreated" && key !== "dateModified" && key !== "encodingFormat" && key !== "author") {
+            if (key === "license") {
+              this.settings.set(this.cwdhash + '-' + "license_url", file[key]["@id"]);
+            } else {
+              this.settings.set(this.cwdhash + '-' + key, file[key]);
+            }
+          }
+        }
+        filedone = true;  // Don't check files again, as they all store the same information.
+      }
+      if (file["@type"] === "Person") { // Set author.
+        this.settings.set(this.cwdhash + '-' + "creator", file["name"]);
+      }
+    }
 
     // Set keywords and update the checkboxes. (Worst case scenario, ask user to refresh jupyterlab, but should be doable without.)
     const keywords = filedescriptor.keywords;
-    for (let keyword of keywords) {
-      for (let tag of tagslist) {
-        for (let tagname of tag.get_tags()) {
-          if (tagname === keyword) {
-            this.settings.set(this.cwdhash + tagname, true);
-          } else { // If tag is not in the list, set it to false.
-            this.settings.set(this.cwdhash + tagname, false);
-          }
-        }
+    for (let tag of tagslist) {
+      for (let tagname of tag.get_tags()) {
+        let tagvar = this.cwdhash + tagname;
+        this.settings.set(tagvar, keywords.includes(tagname));  // if tagname in keywords, set to true, otherwise false
       }
     }
+    this.reset(); // Supposed to reset the widget, doesn't work as intended. Cause unsure, as it works when importing schematic.
   }
 
   async toROCrateJSON(): Promise<any> {
@@ -384,6 +392,10 @@ class metadataManagerWidget extends Widget {
 
     const allfiles = await this.getAllFiles("", []);
     const allfilepaths = allfiles.map((file: any) => file.path);
+    var title = this.getFromInputName("title");
+    if (title === '') {
+      title = "No title set";
+    }
 
     // First, the root directory
     const root = {
@@ -445,6 +457,7 @@ class metadataManagerWidget extends Widget {
           "dateModified": file.last_modified,
           "encodingFormat": file.type === "notebook" ? "application/jupyter+json" : file.mimetype,
           "license": {"@id": license.length > 0 ? license : "https://creativecommons.org/publicdomain/zero/1.0/"},
+          "title": title,
           "author": {"@id": "#" + creator_firstname}
         };
 

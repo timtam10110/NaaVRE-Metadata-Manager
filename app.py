@@ -4,11 +4,12 @@ from pymongo import MongoClient
 from bson import json_util
 from waitress import serve
 import json
-import requests
+
 
 app = Flask(__name__)
 # Allow CORS from any localhost port, as jupyterlab is localhost, but may not always use port 8888. (Localhost is generally safe, anyway)
 CORS(app, resources={r"/*": {"origins": "http://localhost:*"}})
+
 
 client = MongoClient('mongodb://localhost:27017/')
 db = client['test-database']
@@ -35,7 +36,6 @@ def get_data():
 def insert_data():
     try:
         json_data = request.get_json()
-        print(json_data)
         push_to_mongodb(json_data)
         data = {
             "message": "Data inserted successfully",
