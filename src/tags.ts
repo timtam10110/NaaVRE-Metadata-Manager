@@ -83,11 +83,11 @@ export var required_metadata = [
 ]
 
 export var optional_metadata = [
-    "doi", "description", "contributors", "references", "version", "language"
+    "description", "contributor", "version",
 ]
 
 export class MetadataItems {
-    // This will do something later, I promise :skull:
+    // I tried something here, didn't quite work out. Feel free to look at it, though.
     private RequiredhtmlItems: HTMLElement[] = [];
     private requiredhtmlLabels: HTMLElement[] = [];
     private OptionalhtmlItems: HTMLElement[] = [];

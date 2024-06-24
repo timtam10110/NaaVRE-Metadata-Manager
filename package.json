@@ -1,6 +1,6 @@
 {
     "name": "jupyter-lab-metadata-manager",
-    "version": "0.6.1",
+    "version": "0.7.0",
     "description": "A Jupyter Lab extension for managing metadata",
     "keywords": [
         "jupyter",

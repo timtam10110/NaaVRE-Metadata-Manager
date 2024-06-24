@@ -179,7 +179,7 @@ class metadataManagerWidget extends Widget {
       // Get url from input field
       let url = url_input.value;
       if (url === '') {
-        console.warn('No MongoDB URL provided. Using default URL (http://localhost:5000/api/insert)');
+        console.warn('No API URL provided. Using default URL (http://localhost:5000/api/insert)');
         url = 'http://localhost:5000/api/insert';
       }
 
@@ -236,9 +236,9 @@ class metadataManagerWidget extends Widget {
   }
 
   importSchematic(schematic: any): void {
-    let requiredItems = metadata_items["Required items"]; // Ensures that the required items are always present.
+    let required_items = metadata_items["Required items"];     // Ensures that the required items are always present.
     let new_metadata_items: any = {};
-    new_metadata_items["Required items"] = requiredItems;
+    new_metadata_items["Required items"] = required_items;
     for (let header of Object.keys(schematic)) {
       if (header === "Required items") {
         continue;
@@ -347,7 +347,7 @@ class metadataManagerWidget extends Widget {
         this.settings.set(tagvar, keywords.includes(tagname));  // if tagname in keywords, set to true, otherwise false
       }
     }
-    this.reset(); // Supposed to reset the widget, doesn't work as intended. Cause unsure, as it works when importing schematic.
+    this.reset(); // Supposed to reset the widget, doesn't work as intended. Cause unsure, as it works when importing a schema.
   }
 
   async toROCrateJSON(): Promise<any> {
@@ -362,14 +362,14 @@ class metadataManagerWidget extends Widget {
     // Loop over all input field labels, and if the label is not in the context, add it as a new item.
     let new_items: any = {};
     for (let item of this.inputFields) {
-      if (items[item.name] === undefined && item.name !== "license_url") {
+      if (items[item.name] === undefined && item.name !== "license_url" && item.name !== "creator" && item.value !== "") {
         new_items[item.name] = item.name;
       }
     }
     obj["@context"] = [context_url, new_items]
 
     // Loop over the checkboxes and add them to an array
-    var keywords = [];
+    let keywords = [];
     for (let tag of tagslist) {
       for (let tagname of tag.get_tags()) {
         const tagvar = this.cwdhash + tagname;
@@ -392,11 +392,8 @@ class metadataManagerWidget extends Widget {
 
     const allfiles = await this.getAllFiles("", []);
     const allfilepaths = allfiles.map((file: any) => file.path);
-    var title = this.getFromInputName("title");
-    if (title === '') {
-      title = "No title set";
-    }
 
+    // Now, we need to create the RO-Crate structure.
     // First, the root directory
     const root = {
       "@id": "./",
@@ -432,7 +429,7 @@ class metadataManagerWidget extends Widget {
       }
     }
 
-    // Collect general information
+    // Collect general information for files.
     const license = this.getFromInputName("license_url");
     const creator = this.getFromInputName("creator");
     const creator_firstname = creator.slice(0, creator.indexOf(" "));
@@ -443,14 +440,30 @@ class metadataManagerWidget extends Widget {
       "name": creator.length > 0 ? creator : "Unknown"
     };
 
+    var title = this.getFromInputName("title");
+    if (title === '') { title = "No title set"; }
+
     // Finally, all the files
     var files = [];
     for (let file of allfiles) {
       if (file.type === "file" || file.type === "notebook") {
+        let filetype = file.type;
+        // If filetype is a programming language, update filetype to also include "SoftwareSourceCode"
+        if (filetype === "file") {
+          const extension = file.name.split('.').pop();
+          if (extension === "py" || extension === "R" || extension === "jl" || extension === "js" || extension === "java" || extension === "c" || extension === "cpp" || extension === "h" || extension === "hpp") {
+            filetype = ["File", "SoftwareSourceCode"];
+          } else {
+            filetype = "File";
+          }
+        } else { // Notebook
+          filetype = ["Notebook", "SoftwareSourceCode"];
+        }
+
         const filecontent = await this.app.serviceManager.contents.get(file.path, { content: true });
         const fileinfo: any = {
           "@id": escapeSpecialCharacters(file.path),
-          "@type": "File",
+          "@type": filetype,
           "name": file.name,
           "contentSize": filecontent.content.length,
           "dateCreated": file.created,
